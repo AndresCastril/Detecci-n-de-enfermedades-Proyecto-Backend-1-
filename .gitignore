@@ -1,1 +1,3 @@
-server/certificate/
+server/certificate/keystore.p12
+client/truststore.p12
+

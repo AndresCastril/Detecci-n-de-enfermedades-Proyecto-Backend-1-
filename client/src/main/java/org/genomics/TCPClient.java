@@ -56,6 +56,22 @@ public class TCPClient {
 
     public static void main(String[] args) {
         TCPClient client = new TCPClient("localhost", 8080);
-        client.sendMessage("Hello from client with truststore!");
+        client.sendMessage(
+                "CREATE_PATIENT\n" +
+                        "full_name:Andres David Castrillon\n" +
+                        "document_id:1055359130\n" +
+                        "age:22\n" +
+                        "sex:M\n" +
+                        "contact_email:andres@example.com\n" +
+                        "registration_date:2025-09-08\n" +
+                        "clinical_notes:Test\n" +
+                        "checksum_fasta:abcd1234\n" +
+                        "file_size_bytes:24\n" +
+                        "FASTA_FILE\n" +
+                        ">patient001\n" +
+                        "ACGTACGTACGTACGTACGT\n" +
+                        "END_FASTA"
+        );
+
     }
 }
