@@ -5,7 +5,7 @@ import java.io.*;
 import java.security.KeyStore;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class TCPServer {
+public class TCPServer{
     private int serverPort;
     private static AtomicInteger patientCounter = new AtomicInteger(1); // genera patient_id
 
