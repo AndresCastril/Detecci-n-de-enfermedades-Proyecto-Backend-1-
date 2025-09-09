@@ -4,10 +4,15 @@ import javax.net.ssl.*;
 import java.io.*;
 import java.security.KeyStore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Map;
+import java.util.HashMap;
+
 
 public class TCPServer {
     private int serverPort;
     private static AtomicInteger patientCounter = new AtomicInteger(1); // genera patient_id
+    private Map<String, String> diseaseDatabase = new HashMap<>(); // Base de datos de enfermedades en memoria
+
 
     public TCPServer(int serverPort) {
         this.serverPort = serverPort;
@@ -38,6 +43,7 @@ public class TCPServer {
             SSLServerSocket serverSocket = (SSLServerSocket) factory.createServerSocket(serverPort);
 
             System.out.println("Server started on port: " + serverPort);
+            loadDiseaseDatabase(); // Llamamos a la base de datos para cargarla al iniciar el servidor
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
@@ -149,6 +155,44 @@ public class TCPServer {
         }
         return field;
     }
+
+    private void loadDiseaseDatabase() {
+        try (BufferedReader br = new BufferedReader(new FileReader("data/catalog.csv"))) {
+            String line = br.readLine(); // leer encabezado y saltarlo
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length == 4) { // disease_id,name,severity,fasta_path
+                    String diseaseId = parts[0].trim();
+                    String fastaPath = parts[3].trim();
+
+                    String sequence = loadFastaSequence(fastaPath);
+                    if (!sequence.isEmpty()) {
+                        diseaseDatabase.put(diseaseId, sequence);
+                    }
+                }
+            }
+            System.out.println("Loaded " + diseaseDatabase.size() + " diseases into database.");
+        } catch (Exception e) {
+            System.err.println("Error loading disease database: " + e.getMessage());
+        }
+    }
+
+    private String loadFastaSequence(String fastaPath) {
+        StringBuilder seq = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new FileReader(fastaPath))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.startsWith(">")) {
+                    seq.append(line.trim());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error reading FASTA file: " + fastaPath + " - " + e.getMessage());
+        }
+        return seq.toString();
+    }
+
+
     public static void main(String[] args) {
         TCPServer server = new TCPServer(8080);
         server.start();
