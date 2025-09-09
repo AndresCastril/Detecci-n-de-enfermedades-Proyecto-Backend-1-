@@ -1,0 +1,2 @@
+patient_id,full_name,document_id,age,sex,contact_email,registration_date,clinical_notes,checksum_fasta,file_size_bytes
+1,Ana maría,104801590,22,M,María@example.com,2025-09-08,Test,abcdds1234,

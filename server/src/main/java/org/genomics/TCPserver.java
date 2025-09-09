@@ -43,7 +43,7 @@ public class TCPServer {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
                 System.out.println("Client connected: " + clientSocket.getInetAddress());
 
-                handleClient(clientSocket);
+                new Thread(() -> handleClient(clientSocket)).start();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -68,7 +68,9 @@ public class TCPServer {
             if (request.toString().startsWith("CREATE_PATIENT")) {
                 int newId = patientCounter.getAndIncrement();
                 out.println("SUCCESS");
-                out.println("patient_id:" + newId);
+                out.print("patient_id:" + newId);
+                savePatientToCSV(newId, request.toString());
+                System.out.println("Assigned patient_id: " + newId + "\n");
             } else {
                 out.println("ERROR");
                 out.println("message:Unknown command");
@@ -84,6 +86,68 @@ public class TCPServer {
         }
     }
 
+    private void savePatientToCSV(int patientId, String request) {
+        File csvFile = new File("data/patients.csv");
+        boolean fileExists = csvFile.exists();
+
+        try (FileWriter fw = new FileWriter(csvFile, true);
+             BufferedWriter bw = new BufferedWriter(fw);
+             PrintWriter pw = new PrintWriter(bw)) {
+
+            if (!fileExists) {
+                pw.println("patient_id,full_name,document_id,age,sex,contact_email,registration_date,clinical_notes,checksum_fasta,file_size_bytes");
+            }
+
+            String[] lines = request.split("\n");
+            String fullName = "";
+            String documentId = "";
+            String age = "";
+            String sex = "";
+            String email = "";
+            String regDate = "";
+            String notes = "";
+            String checksum = "";
+            String fileSize = "";
+
+            for (String line : lines) {
+                if (line.startsWith("full_name:")) fullName = line.split(":", 2)[1];
+                if (line.startsWith("document_id:")) documentId = line.split(":", 2)[1];
+                if (line.startsWith("age:")) age = line.split(":", 2)[1];
+                if (line.startsWith("sex:")) sex = line.split(":", 2)[1];
+                if (line.startsWith("contact_email:")) email = line.split(":", 2)[1];
+                if (line.startsWith("registration_date:")) regDate = line.split(":", 2)[1];
+                if (line.startsWith("clinical_notes:")) notes = line.split(":", 2)[1];
+                if (line.startsWith("checksum_fasta:")) checksum = line.split(":", 2)[1];
+                if (line.startsWith("file_size_bytes:")) fileSize = line.split(":", 2)[1];
+            }
+
+
+            pw.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s,%d%n",
+                    patientId,
+                    escapeCsv(fullName),
+                    escapeCsv(documentId),
+                    age,
+                    sex,
+                    escapeCsv(email),
+                    escapeCsv(regDate),
+                    escapeCsv(notes),
+                    escapeCsv(checksum),
+                    fileSize);
+
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    private String escapeCsv(String field) {
+        if (field == null) return "";
+
+        if (field.contains("\"") || field.contains(",")) {
+            return "\"" + field.replace("\"", "\"\"") + "\"";
+        }
+        return field;
+    }
     public static void main(String[] args) {
         TCPServer server = new TCPServer(8080);
         server.start();
