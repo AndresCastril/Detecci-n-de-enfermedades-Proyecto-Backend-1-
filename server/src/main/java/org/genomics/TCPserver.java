@@ -140,6 +140,7 @@ public class TCPServer {
             e.printStackTrace();
         }
     }
+    // Sebs esto era para separar campos con comas o comillas en CSV, no sirvio de mucho, eliminalo si quieres
     private String escapeCsv(String field) {
         if (field == null) return "";
 
