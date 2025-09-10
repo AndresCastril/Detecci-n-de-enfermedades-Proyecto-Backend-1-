@@ -7,12 +7,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
 import java.util.HashMap;
 
-
 public class TCPServer {
     private int serverPort;
     private static AtomicInteger patientCounter = new AtomicInteger(1); // genera patient_id
     private Map<String, String[]> diseaseDatabase = new HashMap<>(); // Base de datos de enfermedades en memoria
-
 
     public TCPServer(int serverPort) {
         this.serverPort = serverPort;
@@ -30,7 +28,6 @@ public class TCPServer {
                 keyStore.load(keyStoreStream, keystorePassword.toCharArray());
             }
 
-
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             kmf.init(keyStore, keystorePassword.toCharArray());
 
@@ -42,8 +39,11 @@ public class TCPServer {
             SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) factory.createServerSocket(serverPort);
 
+            //Inicializar contador de pacientes según CSV
+            initPatientCounter();
+
             System.out.println("Server started on port: " + serverPort);
-            loadDiseaseDatabase(); // Llamamos a la base de datos para cargarla al iniciar el servidor
+            loadDiseaseDatabase(); // cargar enfermedades
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
@@ -53,6 +53,38 @@ public class TCPServer {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    //leer el último ID de patients.csv
+    private void initPatientCounter() {
+        File csvFile = new File("data/patients.csv");
+        if (!csvFile.exists()) {
+            patientCounter.set(1);
+            return;
+        }
+
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+            String header = br.readLine(); // saltar encabezado
+            String line;
+            int lastId = 0;
+
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",", -1);
+                if (parts.length > 0) {
+                    try {
+                        int id = Integer.parseInt(parts[0].trim());
+                        if (id > lastId) lastId = id;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+
+            patientCounter.set(lastId + 1);
+            System.out.println("Patient counter initialized to: " + patientCounter.get());
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            patientCounter.set(1); // fallback
         }
     }
 
@@ -123,7 +155,30 @@ public class TCPServer {
                 }
             }
 
-
+            else if (request.toString().startsWith("UPDATE_PATIENT")) {
+                String[] parts = request.toString().split("\n");
+                String idLine = parts[0]; // UPDATE_PATIENT <id>
+                String[] tokens = idLine.split(" ");
+                if (tokens.length == 2) {
+                    try {
+                        int patientId = Integer.parseInt(tokens[1]);
+                        boolean updated = updatePatient(patientId, request.toString());
+                        if (updated) {
+                            out.println("SUCCESS");
+                            out.println("message:Patient " + patientId + " updated");
+                        } else {
+                            out.println("ERROR");
+                            out.println("message:Patient not found or inactive");
+                        }
+                    } catch (NumberFormatException e) {
+                        out.println("ERROR");
+                        out.println("message:Invalid patient ID");
+                    }
+                } else {
+                    out.println("ERROR");
+                    out.println("message:Invalid UPDATE_PATIENT format");
+                }
+            }
             System.out.println("Response sent, closing connection.");
 
         } catch (Exception e) {
@@ -320,15 +375,72 @@ public class TCPServer {
 
 
 
-    // Sebs esto era para separar campos con comas o comillas en CSV, no sirvio de mucho, eliminalo si quieres
-    private String escapeCsv(String field) {
-        if (field == null) return "";
+    private boolean updatePatient(int patientId, String request) {
+        File inputFile = new File("data/patients.csv");
+        File tempFile = new File("data/patients_temp.csv");
 
-        if (field.contains("\"") || field.contains(",")) {
-            return "\"" + field.replace("\"", "\"\"") + "\"";
+        if (!inputFile.exists()) return false;
+
+        boolean updated = false;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+             PrintWriter writer = new PrintWriter(new FileWriter(tempFile))) {
+
+            String header = reader.readLine();
+            if (header == null) return false;
+            writer.println(header);
+
+            String[] lines = request.split("\n");
+            String fullName = "", documentId = "", age = "", sex = "", email = "",
+                    regDate = "", notes = "", checksum = "", fileSize = "";
+
+            for (String line : lines) {
+                if (line.startsWith("full_name:")) fullName = line.split(":", 2)[1];
+                if (line.startsWith("document_id:")) documentId = line.split(":", 2)[1];
+                if (line.startsWith("age:")) age = line.split(":", 2)[1];
+                if (line.startsWith("sex:")) sex = line.split(":", 2)[1];
+                if (line.startsWith("contact_email:")) email = line.split(":", 2)[1];
+                if (line.startsWith("registration_date:")) regDate = line.split(":", 2)[1];
+                if (line.startsWith("clinical_notes:")) notes = line.split(":", 2)[1];
+                if (line.startsWith("checksum_fasta:")) checksum = line.split(":", 2)[1];
+                if (line.startsWith("file_size_bytes:")) fileSize = line.split(":", 2)[1];
+            }
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",", -1);
+                if (parts[0].trim().equals(String.valueOf(patientId)) &&
+                        parts[parts.length - 1].equalsIgnoreCase("true")) {
+
+                    writer.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,true%n",
+                            patientId,
+                            safe(fullName),
+                            safe(documentId),
+                            safe(age),
+                            safe(sex),
+                            safe(email),
+                            safe(regDate),
+                            safe(notes),
+                            safe(checksum),
+                            safe(fileSize));
+                    updated = true;
+                } else {
+                    writer.println(line);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
         }
-        return field;
+
+        if (!inputFile.delete()) return false;
+        if (!tempFile.renameTo(inputFile)) return false;
+
+        return updated;
     }
+
+
 
     private String safe(String value) {
         if (value == null || value.trim().isEmpty()) {

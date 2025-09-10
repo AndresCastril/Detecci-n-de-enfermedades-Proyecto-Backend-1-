@@ -1,6 +1,6 @@
 patient_id,full_name,document_id,age,sex,contact_email,registration_date,clinical_notes,checksum_fasta,file_size_bytes,is_active
 
 1,Ana maría,104801590,22,M,María@example.com,2025-09-08,Test,abcdds1234,24,true
-2,Sebas Salazar,200345678,19,M,sebas@example.com,2025-09-09,Paciente con sintomas de covid,xyz123covid,12,false
-1,Ana maría,104801590,22,M,María@example.com,2025-09-08,Test,abcdds1234,24,true
-2,Sebas Salazar,200345678,19,M,sebas@example.com,2025-09-09,Paciente con sintomas de covid,xyz123covid,12,false
+2,Sebas Salazar,200345678,19,M,sebas@example.com,2025-09-09,Paciente con sintomas de covid,xyz123covid,12,true
+
+3,Andres Castrillon,1055555,20,M,andres@gmail.com,2025-09-09,si,PlhpQLSHOIPk3iER0KyNEn8sRVJj8p60zoDDpUWIH9g=,10,true

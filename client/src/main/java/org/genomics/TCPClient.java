@@ -3,6 +3,9 @@ package org.genomics;
 import javax.net.ssl.*;
 import java.io.*;
 import java.security.KeyStore;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 public class TCPClient {
     private String serverAddress;
@@ -42,7 +45,6 @@ public class TCPClient {
                 out.println(message);
                 System.out.println("Message sent to server.");
 
-
                 String response;
                 while ((response = in.readLine()) != null) {
                     System.out.println("Server response: " + response);
@@ -53,41 +55,136 @@ public class TCPClient {
         }
     }
 
+    // Calcular checksum automáticamente con SHA-256
+    private static String calculateChecksum(String fastaSequence) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(fastaSequence.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(digest);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "invalid_checksum";
+        }
+    }
+
     public static void main(String[] args) {
         TCPClient client = new TCPClient("localhost", 8080);
-        client.sendMessage(
-                "CREATE_PATIENT\n" +
-                        "full_name:Ana maría\n" +
-                        "document_id:104801590\n" +
-                        "age:22\n" +
-                        "sex:M\n" +
-                        "contact_email:María@example.com\n" +
-                        "registration_date:2025-09-08\n" +
-                        "clinical_notes:Test\n" +
-                        "checksum_fasta:abcdds1234\n" +
-                        "file_size_bytes:24\n" +
-                        "FASTA_FILE\n" +
-                        ">patient002\n" +
-                        "ACGTACGTACGTACGTGCGT\n" +
-                        "END_FASTA"
-                    );
-        client.sendMessage(
-                "CREATE_PATIENT\n" + //Creamos un paciente nuevo con covid19 para probar
-                        "full_name:Sebas Salazar\n" +
-                        "document_id:200345678\n" +
-                        "age:19\n" +
-                        "sex:M\n" +
-                        "contact_email:sebas@example.com\n" +
-                        "registration_date:2025-09-09\n" +
-                        "clinical_notes:Paciente con sintomas de covid\n" +
-                        "checksum_fasta:xyz123covid\n" +
-                        "file_size_bytes:12\n" +
-                        "FASTA_FILE\n" +
-                        ">patient003\n" +
-                        "ACGTACGTACGTACGTTTGACCGTAGGACTGA\n" +
-                        "END_FASTA"
-        );
-        client.sendMessage("DELETE_PATIENT 2\nEND_FASTA");
-        client.sendMessage("GET_PATIENT 2\nEND_FASTA");
+        java.util.Scanner scanner = new java.util.Scanner(System.in);
+
+        while (true) {
+            System.out.println("\n=== MENU ===");
+            System.out.println("1. Create patient");
+            System.out.println("2. Get patient by ID");
+            System.out.println("3. Delete patient by ID");
+            System.out.println("4. Update patient by ID");
+            System.out.println("5. Exit");
+
+            String opcion = scanner.nextLine();
+
+            if (opcion.equals("1")) {
+                System.out.print("Full name: ");
+                String fullName = scanner.nextLine();
+                System.out.print("Personal ID: ");
+                String doc = scanner.nextLine();
+                System.out.print("Age: ");
+                String age = scanner.nextLine();
+                System.out.print("Sex (M/F): ");
+                String sex = scanner.nextLine();
+                System.out.print("Email: ");
+                String email = scanner.nextLine();
+                System.out.print("Date of resgister (YYYY-MM-DD): ");
+                String date = scanner.nextLine();
+                System.out.print("clinical notes: ");
+                String notes = scanner.nextLine();
+                System.out.print("FASTA sequence (without '>'): ");
+                String fastaSeq = scanner.nextLine();
+
+                //Generar checksum automáticamente
+                String checksum = calculateChecksum(fastaSeq);
+                String fileSize = String.valueOf(fastaSeq.length());
+
+                String message =
+                        "CREATE_PATIENT\n" +
+                                "full_name:" + fullName + "\n" +
+                                "document_id:" + doc + "\n" +
+                                "age:" + age + "\n" +
+                                "sex:" + sex + "\n" +
+                                "contact_email:" + email + "\n" +
+                                "registration_date:" + date + "\n" +
+                                "clinical_notes:" + notes + "\n" +
+                                "checksum_fasta:" + checksum + "\n" +
+                                "file_size_bytes:" + fileSize + "\n" +
+                                "FASTA_FILE\n" +
+                                ">" + fullName.replace(" ", "_") + "\n" +
+                                fastaSeq + "\n" +
+                                "END_FASTA";
+
+                client.sendMessage(message);
+
+            } else if (opcion.equals("2")) {
+                System.out.print("Patient ID: ");
+                String id = scanner.nextLine();
+                String message = "GET_PATIENT " + id + "\nEND_FASTA";
+                client.sendMessage(message);
+
+            } else if (opcion.equals("3")) {
+                System.out.print("Patient ID: ");
+                String id = scanner.nextLine();
+                String message = "DELETE_PATIENT " + id + "\nEND_FASTA";
+                client.sendMessage(message);
+
+            } else if (opcion.equals("4")) {
+                System.out.print("Patient ID for updating: ");
+                String id = scanner.nextLine();
+
+                System.out.print("Full name: ");
+                String fullName = scanner.nextLine();
+                System.out.print("Personal ID: ");
+                String doc = scanner.nextLine();
+                System.out.print("Age: ");
+                String age = scanner.nextLine();
+                System.out.print("Sex (M/F): ");
+                String sex = scanner.nextLine();
+                System.out.print("Email: ");
+                String email = scanner.nextLine();
+                System.out.print("Date of resgister (YYYY-MM-DD): ");
+                String date = scanner.nextLine();
+                System.out.print("clinical notes: ");
+                String notes = scanner.nextLine();
+                System.out.print("FASTA sequence (without '>'): ");
+                String fastaSeq = scanner.nextLine();
+
+                // checksum automático también en UPDATE
+                String checksum = calculateChecksum(fastaSeq);
+                String fileSize = String.valueOf(fastaSeq.length());
+
+                String message =
+                        "UPDATE_PATIENT " + id + "\n" +
+                                "full_name:" + fullName + "\n" +
+                                "document_id:" + doc + "\n" +
+                                "age:" + age + "\n" +
+                                "sex:" + sex + "\n" +
+                                "contact_email:" + email + "\n" +
+                                "registration_date:" + date + "\n" +
+                                "clinical_notes:" + notes + "\n" +
+                                "checksum_fasta:" + checksum + "\n" +
+                                "file_size_bytes:" + fileSize + "\n" +
+                                "FASTA_FILE\n" +
+                                ">" + fullName.replace(" ", "_") + "\n" +
+                                fastaSeq + "\n" +
+                                "END_FASTA";
+
+                client.sendMessage(message);
+
+            } else if (opcion.equals("5")) {
+                System.out.println("Exiting...");
+                break;
+            } else {
+                System.out.println("Invalid input.");
+            }
+        }
+
+
+        scanner.close();
     }
 }
