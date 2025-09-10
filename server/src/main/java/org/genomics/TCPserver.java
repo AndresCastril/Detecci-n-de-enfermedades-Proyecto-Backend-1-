@@ -11,7 +11,7 @@ import java.util.HashMap;
 public class TCPServer {
     private int serverPort;
     private static AtomicInteger patientCounter = new AtomicInteger(1); // genera patient_id
-    private Map<String, String> diseaseDatabase = new HashMap<>(); // Base de datos de enfermedades en memoria
+    private Map<String, String[]> diseaseDatabase = new HashMap<>(); // Base de datos de enfermedades en memoria
 
 
     public TCPServer(int serverPort) {
@@ -76,6 +76,8 @@ public class TCPServer {
                 out.println("SUCCESS");
                 out.print("patient_id:" + newId);
                 savePatientToCSV(newId, request.toString());
+                String patientSequence = extractFastaSequence(request.toString());
+                detectDiseases(newId, patientSequence);
                 System.out.println("Assigned patient_id: " + newId + "\n");
             } else {
                 out.println("ERROR");
@@ -128,17 +130,18 @@ public class TCPServer {
             }
 
 
-            pw.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s,%d%n",
+            pw.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
                     patientId,
-                    escapeCsv(fullName),
-                    escapeCsv(documentId),
-                    age,
-                    sex,
-                    escapeCsv(email),
-                    escapeCsv(regDate),
-                    escapeCsv(notes),
-                    escapeCsv(checksum),
-                    fileSize);
+                    safe(fullName),
+                    safe(documentId),
+                    safe(age),
+                    safe(sex),
+                    safe(email),
+                    safe(regDate),
+                    safe(notes),
+                    safe(checksum),
+                    safe(fileSize));
+            System.out.println("\n" );
 
 
 
@@ -156,6 +159,13 @@ public class TCPServer {
         return field;
     }
 
+    private String safe(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+        return value.trim();
+    }
+
     private void loadDiseaseDatabase() {
         try (BufferedReader br = new BufferedReader(new FileReader("data/catalog.csv"))) {
             String line = br.readLine(); // leer encabezado y saltarlo
@@ -163,11 +173,12 @@ public class TCPServer {
                 String[] parts = line.split(",");
                 if (parts.length == 4) { // disease_id,name,severity,fasta_path
                     String diseaseId = parts[0].trim();
+                    String severity = parts[2].trim();
                     String fastaPath = parts[3].trim();
 
                     String sequence = loadFastaSequence(fastaPath);
                     if (!sequence.isEmpty()) {
-                        diseaseDatabase.put(diseaseId, sequence);
+                        diseaseDatabase.put(diseaseId, new String[]{sequence, severity});
                     }
                 }
             }
@@ -188,6 +199,62 @@ public class TCPServer {
             }
         } catch (Exception e) {
             System.err.println("Error reading FASTA file: " + fastaPath + " - " + e.getMessage());
+        }
+        return seq.toString();
+    }
+
+    private void detectDiseases(int patientId, String patientSequence) { //Comparar secuencia genetica de paciente con base de datos
+        File csvFile = new File("reports/detections.csv");
+        boolean fileExists = csvFile.exists();
+
+        try (FileWriter fw = new FileWriter(csvFile, true);
+             BufferedWriter bw = new BufferedWriter(fw);
+             PrintWriter pw = new PrintWriter(bw)) {
+
+            if (!fileExists) {
+                pw.println("patient_id,disease_id,severity,date_time,description");
+            }
+
+            for (Map.Entry<String, String[]> entry : diseaseDatabase.entrySet()) {
+                String diseaseId = entry.getKey();
+                String diseaseSeq = entry.getValue()[0];
+                String severity = entry.getValue()[1];
+
+                System.out.println("Comparando paciente " + patientId + " con " + diseaseId);
+                System.out.println("Paciente: " + patientSequence);
+                System.out.println("Enfermedad: " + diseaseSeq);
+
+                if (patientSequence.contains(diseaseSeq)) {
+                    String dateTime = java.time.LocalDateTime.now().toString();
+                    String description = "Match found for " + diseaseId;
+
+                    pw.printf("%d,%s,%s,%s,%s%n",
+                            patientId, diseaseId, severity, dateTime, description);
+
+                    System.out.println("Detection: patient " + patientId + " -> " + diseaseId);
+                }
+            }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private String extractFastaSequence(String request) {
+        StringBuilder seq = new StringBuilder();
+        String[] lines = request.split("\n");
+        boolean fastaStarted = false;
+
+        for (String line : lines) {
+            if (line.startsWith(">")) {
+                fastaStarted = true;
+                continue;
+            }
+            if (fastaStarted && !line.equals("END_FASTA")) {
+                seq.append(line.trim());
+            }
         }
         return seq.toString();
     }

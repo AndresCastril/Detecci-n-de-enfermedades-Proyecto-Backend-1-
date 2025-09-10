@@ -70,6 +70,22 @@ public class TCPClient {
                         ">patient002\n" +
                         "ACGTACGTACGTACGTGCGT\n" +
                         "END_FASTA"
+                    );
+        client.sendMessage(
+                "CREATE_PATIENT\n" + //Creamos un paciente nuevo con covid19 para probar
+                        "full_name:Sebas Salazar\n" +
+                        "document_id:200345678\n" +
+                        "age:19\n" +
+                        "sex:M\n" +
+                        "contact_email:sebas@example.com\n" +
+                        "registration_date:2025-09-09\n" +
+                        "clinical_notes:Paciente con sintomas de covid\n" +
+                        "checksum_fasta:xyz123covid\n" +
+                        "file_size_bytes:12\n" +
+                        "FASTA_FILE\n" +
+                        ">patient003\n" +
+                        "ACGTACGTACGTACGTTTGACCGTAGGACTGA\n" +
+                        "END_FASTA"
         );
     }
 }
