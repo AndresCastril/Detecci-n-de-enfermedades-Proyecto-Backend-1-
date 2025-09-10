@@ -6,6 +6,10 @@ import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.Scanner;
+
 
 public class TCPClient {
     private String serverAddress;
@@ -87,19 +91,53 @@ public class TCPClient {
                 System.out.print("Personal ID: ");
                 String doc = scanner.nextLine();
                 System.out.print("Age: ");
-                String age = scanner.nextLine();
-                System.out.print("Sex (M/F): ");
-                String sex = scanner.nextLine();
+                int age;
+                while (true) {
+
+                    String ageInput = scanner.nextLine();
+                    try {
+                        age = Integer.parseInt(ageInput);
+                        if (age >= 0 && age <= 120) {
+                            break;
+                        } else {
+                            System.out.println("Invalid age, please enter a number between 0 and 120.");
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input, please enter a number.");
+                    }
+                }
+                String sex;
+                while (true) {
+                    System.out.print("Sex (M/F): ");
+                    sex = scanner.nextLine().trim().toUpperCase();
+                    if (sex.equals("M") || sex.equals("F")) {
+                        break;
+                    } else {
+                        System.out.println("Invalid input, please enter 'M' or 'F'.");
+                    }
+                }
+
                 System.out.print("Email: ");
                 String email = scanner.nextLine();
-                System.out.print("Date of resgister (YYYY-MM-DD): ");
-                String date = scanner.nextLine();
+                LocalDate date = LocalDate.now();
+                System.out.println("Date of register: " + date);
                 System.out.print("clinical notes: ");
                 String notes = scanner.nextLine();
-                System.out.print("FASTA sequence (without '>'): ");
-                String fastaSeq = scanner.nextLine();
+                String fastaSeq;
+                while (true) {
+                    System.out.print("FASTA sequence (without '>'): ");
+                    fastaSeq = scanner.nextLine().trim();
 
-                //Generar checksum automáticamente
+                    // Regex: solo acepta letras A, T, C, G o U (mayúsculas), al menos una vez
+                    if (fastaSeq.matches(">?[ATCGU]+$")) {
+                        break;
+                    } else {
+                        System.out.println("Invalid FASTA sequence, please use only uppercase letters A, T, C, G, U.");
+                    }
+                }
+
+
+
                 String checksum = calculateChecksum(fastaSeq);
                 String fileSize = String.valueOf(fastaSeq.length());
 

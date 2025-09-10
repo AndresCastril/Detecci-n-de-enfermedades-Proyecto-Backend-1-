@@ -4,3 +4,5 @@ patient_id,full_name,document_id,age,sex,contact_email,registration_date,clinica
 2,Sebas Salazar,200345678,19,M,sebas@example.com,2025-09-09,Paciente con sintomas de covid,xyz123covid,12,true
 
 3,Andres Castrillon,1055555,20,M,andres@gmail.com,2025-09-09,si,PlhpQLSHOIPk3iER0KyNEn8sRVJj8p60zoDDpUWIH9g=,10,true
+4,Jose Maria Cardona Zambrano,1234567894,19,M,JoseMaria@gmail.com,2025-09-10,El paciente se est� muriendo,SWGMesBZNHNGJ/VpavttPBuP0/yY5tWyVCKn7mmHv+8=,13,false
+5,a,a,19,M,a,2025-09-10,a,ZYuaM2bGOxuaTxQSFMFRcp2P2Sbj4NjY6+ZqvF7nm5w=,8,true

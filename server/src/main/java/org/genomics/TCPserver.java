@@ -106,7 +106,7 @@ public class TCPServer{
             if (request.toString().startsWith("CREATE_PATIENT")) {
                 int newId = patientCounter.getAndIncrement();
                 out.println("SUCCESS");
-                out.println("patient_id:" + newId); // ojo: mejor usar println que print
+                out.println("patient_id:" + newId);
                 savePatientToCSV(newId, request.toString());
                 String patientSequence = extractFastaSequence(request.toString());
                 detectDiseases(newId, patientSequence);
