@@ -87,5 +87,7 @@ public class TCPClient {
                         "ACGTACGTACGTACGTTTGACCGTAGGACTGA\n" +
                         "END_FASTA"
         );
+        client.sendMessage("DELETE_PATIENT 2\nEND_FASTA");
+        client.sendMessage("GET_PATIENT 2\nEND_FASTA");
     }
 }

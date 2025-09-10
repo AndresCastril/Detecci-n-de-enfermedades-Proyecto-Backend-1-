@@ -74,17 +74,58 @@ public class TCPServer {
             if (request.toString().startsWith("CREATE_PATIENT")) {
                 int newId = patientCounter.getAndIncrement();
                 out.println("SUCCESS");
-                out.print("patient_id:" + newId);
+                out.println("patient_id:" + newId); // ojo: mejor usar println que print
                 savePatientToCSV(newId, request.toString());
                 String patientSequence = extractFastaSequence(request.toString());
                 detectDiseases(newId, patientSequence);
                 System.out.println("Assigned patient_id: " + newId + "\n");
-            } else {
-                out.println("ERROR");
-                out.println("message:Unknown command");
+
+            } else if (request.toString().startsWith("GET_PATIENT")) {
+                String[] parts = request.toString().split("\n");
+                String idLine = parts[0]; // GET_PATIENT <id>
+                String[] tokens = idLine.split(" ");
+                if (tokens.length == 2) {
+                    int patientId = Integer.parseInt(tokens[1]);
+                    String patientData = getPatientById(patientId);
+                    if (patientData != null) {
+                        out.println("SUCCESS");
+                        out.println(patientData);
+                    } else {
+                        out.println("ERROR");
+                        out.println("message:Patient not found");
+                    }
+                } else {
+                    out.println("ERROR");
+                    out.println("message:Invalid GET_PATIENT format");
+                }
+
+            } else if (request.toString().startsWith("DELETE_PATIENT")) {
+                // Separa por cualquier espacio o salto de línea extra
+                String[] parts = request.toString().split("\\s+");
+                if (parts.length >= 2) {
+                    try {
+                        int patientId = Integer.parseInt(parts[1].trim());
+                        boolean deleted = deletePatient(patientId);
+                        if (deleted) {
+                            out.println("SUCCESS");
+                            out.println("message:Patient " + patientId + " deleted (is_active=false)");
+                        } else {
+                            out.println("ERROR");
+                            out.println("message:Patient not found");
+                        }
+                    } catch (NumberFormatException e) {
+                        out.println("ERROR");
+                        out.println("message:Invalid patient ID");
+                    }
+                } else {
+                    out.println("ERROR");
+                    out.println("message:Invalid DELETE_PATIENT format");
+                }
             }
 
+
             System.out.println("Response sent, closing connection.");
+
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -103,7 +144,7 @@ public class TCPServer {
              PrintWriter pw = new PrintWriter(bw)) {
 
             if (!fileExists) {
-                pw.println("patient_id,full_name,document_id,age,sex,contact_email,registration_date,clinical_notes,checksum_fasta,file_size_bytes");
+                pw.println("patient_id,full_name,document_id,age,sex,contact_email,registration_date,clinical_notes,checksum_fasta,file_size_bytes,is_active");
             }
 
             String[] lines = request.split("\n");
@@ -130,7 +171,7 @@ public class TCPServer {
             }
 
 
-            pw.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
+            pw.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,true%n",
                     patientId,
                     safe(fullName),
                     safe(documentId),
@@ -149,6 +190,136 @@ public class TCPServer {
             e.printStackTrace();
         }
     }
+
+    private String getPatientById(int patientId) {
+        File csvFile = new File("data/patients.csv");
+        if (!csvFile.exists()) return null;
+
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+            String headerLine = br.readLine();
+            if (headerLine == null) return null;
+
+            // Mapa de nombres de columna a índice
+            String[] headers = headerLine.split(",", -1);
+            int idIdx = -1;
+            int activeIdx = -1;
+            for (int i = 0; i < headers.length; i++) {
+                String h = headers[i].trim().toLowerCase();
+                if (h.equals("patient_id")) idIdx = i;
+                if (h.equals("is_active")) activeIdx = i;
+            }
+
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",", -1); // -1 para conservar columnas vacías al final
+                if (idIdx >= 0 && parts.length > idIdx && parts[idIdx].trim().equals(String.valueOf(patientId))) {
+                    // si existe columna is_active y está en "false", tratamos como no encontrado
+                    if (activeIdx >= 0) {
+                        String activeVal = (parts.length > activeIdx) ? parts[activeIdx].trim().toLowerCase() : "";
+                        if (activeVal.equals("false") || activeVal.equals("0") || activeVal.equals("no")) {
+                            return null; // paciente eliminado lógicamente -> no devolver
+                        }
+                    }
+                    // Si no hay columna is_active, asumimos activo y devolvemos la línea
+                    return line;
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    private boolean deletePatient(int patientId) {
+        File inputFile = new File("data/patients.csv");
+        File tempFile = new File("data/patients_temp.csv");
+
+        if (!inputFile.exists()) return false;
+
+        boolean deleted = false;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+             PrintWriter writer = new PrintWriter(new FileWriter(tempFile))) {
+
+            String header = reader.readLine();
+            if (header == null) return false;
+
+            // Escribimos encabezado (si no tiene is_active, lo agregamos)
+            String[] headers = header.split(",", -1);
+            int activeIdx = -1;
+            for (int i = 0; i < headers.length; i++) {
+                if (headers[i].trim().equalsIgnoreCase("is_active")) {
+                    activeIdx = i;
+                    break;
+                }
+            }
+            if (activeIdx == -1) {
+                // agregamos columna is_active al header
+                writer.println(header + ",is_active");
+                activeIdx = headers.length; // será la última columna nueva
+            } else {
+                writer.println(header);
+            }
+
+            // Reescribimos filas:
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",", -1);
+                String idStr = (parts.length > 0) ? parts[0].trim() : "";
+                if (idStr.equals(String.valueOf(patientId))) {
+                    // Marca como false en la columna is_active
+                    if (parts.length > activeIdx) {
+                        // reemplaza valor de la columna is_active
+                        parts[activeIdx] = "false";
+                    } else {
+                        // debe ampliar la longitud del array (conservando columnas existentes)
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < parts.length; i++) {
+                            if (i > 0) sb.append(",");
+                            sb.append(parts[i]);
+                        }
+                        // añadir comas faltantes hasta activeIdx
+                        for (int i = parts.length; i < activeIdx; i++) sb.append(",");
+                        sb.append(",false"); // append columna is_active=false
+                        writer.println(sb.toString().replace(",,", ",")); // escribimos la fila ampliada
+                        deleted = true;
+                        continue;
+                    }
+                    // reconstruir linea con partes modificadas
+                    StringBuilder outLine = new StringBuilder();
+                    for (int i = 0; i < parts.length; i++) {
+                        if (i > 0) outLine.append(",");
+                        outLine.append(parts[i]);
+                    }
+                    writer.println(outLine.toString());
+                    deleted = true;
+                } else {
+                    // fila sin modificar
+                    writer.println(line);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        // reemplazar archivo original por el temporal
+        if (!inputFile.delete()) {
+            System.err.println("No se pudo borrar patients.csv original");
+            return false;
+        }
+        if (!tempFile.renameTo(inputFile)) {
+            System.err.println("No se pudo renombrar el archivo temporal");
+            return false;
+        }
+
+        return deleted;
+    }
+
+
+
     // Sebs esto era para separar campos con comas o comillas en CSV, no sirvio de mucho, eliminalo si quieres
     private String escapeCsv(String field) {
         if (field == null) return "";
